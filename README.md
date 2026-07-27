@@ -155,6 +155,11 @@ python -m unittest discover -s tests -t . -v
 python -m compileall -q src tests scripts
 ```
 
+GitHub Actions repeats the Python 3.11 core and workstation tests on every push
+and pull request. Hardware/model integration tests automatically run when their
+ignored model assets and optional Pi dependencies are present; otherwise those
+device-specific cases are reported as skipped.
+
 Hardware acceptance steps and metrics are in
 [docs/hardware-validation.md](docs/hardware-validation.md).
 
