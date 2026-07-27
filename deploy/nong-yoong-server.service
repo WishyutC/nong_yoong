@@ -1,0 +1,16 @@
+[Unit]
+Description=Nong Yoong workstation voice API
+After=network-online.target ollama.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=titan
+WorkingDirectory=/home/titan/nong_yoong
+EnvironmentFile=-/home/titan/nong_yoong/.env
+ExecStart=/home/titan/nong_yoong/.venv/bin/nong-yoong-server
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

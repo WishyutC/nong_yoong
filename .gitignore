@@ -1,0 +1,22 @@
+.venv/
+.git/
+.gitdata/
+.agents/
+.codex/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.env
+*.egg-info/
+
+# Runtime output and private recordings
+audio/
+audio_logs/
+audio_output/
+audio_pcm/
+logs/
+data/
+
+# Models are downloaded separately on the target device.
+models/

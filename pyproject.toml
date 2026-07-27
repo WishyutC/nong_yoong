@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "thai-voice-robot"
+version = "0.1.0"
+description = "Shared foundations for the Nong Yoong Thai edge voice robot"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "fastapi>=0.115,<0.120",
+    "pydantic>=2.8,<3",
+    "python-dotenv>=1,<2",
+    "requests>=2.32,<3",
+    "uvicorn>=0.30,<1",
+]
+
+[project.optional-dependencies]
+pi = [
+    "librosa>=0.10.2,<1",
+    "numpy>=1.26,<2",
+    "sherpa-onnx>=1.11,<2",
+    "sounddevice>=0.5,<1",
+    "webrtcvad-wheels>=2.0.14,<3",
+]
+wake = [
+    "tflite-runtime==2.14.0",
+]
+mms = [
+    "numpy>=1.26,<2",
+    "safetensors>=0.4,<1",
+    "torch>=2.1,<3",
+    "transformers>=4.33,<6",
+]
+dev = [
+    "anyio>=4.4,<4.12",
+    "httpx>=0.27,<0.29",
+]
+
+[project.scripts]
+nong-yoong-server = "thai_voice_robot.server.main:main"
+nong-yoong-client = "thai_voice_robot.client.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
