@@ -1,4 +1,5 @@
 .venv/
+.venv-qwen-tts/
 .git/
 .gitdata/
 .agents/

@@ -11,6 +11,8 @@ from pathlib import Path
 from threading import Lock
 from typing import Protocol
 
+import requests
+
 from thai_voice_robot.server.backends import BackendUnavailable
 
 
@@ -194,3 +196,60 @@ class MmsThaiTTS:
             f"noise={self.noise_scale}, duration_noise={self.noise_scale_duration}, "
             f"seed={self.seed}"
         )
+
+
+class QwenThaiTTS:
+    """Client for the isolated workstation-local Qwen3-TTS service."""
+
+    MAX_AUDIO_BYTES = 128 * 1024 * 1024
+
+    def __init__(self, base_url: str, timeout_seconds: float = 300.0) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.timeout_seconds = timeout_seconds
+
+    def synthesize(self, text: str, destination: Path) -> WavInfo:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with requests.post(
+                f"{self.base_url}/synthesize",
+                json={"text": text},
+                stream=True,
+                timeout=(5.0, self.timeout_seconds),
+            ) as response:
+                response.raise_for_status()
+                content_type = response.headers.get("content-type", "").split(";", 1)[0]
+                if content_type != "audio/wav":
+                    raise BackendUnavailable("Qwen3-TTS service returned non-WAV data")
+                try:
+                    declared_size = int(response.headers.get("content-length", "0"))
+                except ValueError as exc:
+                    raise BackendUnavailable(
+                        "Qwen3-TTS service returned an invalid content length"
+                    ) from exc
+                if declared_size > self.MAX_AUDIO_BYTES:
+                    raise BackendUnavailable("Qwen3-TTS WAV exceeds the size limit")
+                received = 0
+                with destination.open("wb") as output:
+                    for chunk in response.iter_content(64 * 1024):
+                        if not chunk:
+                            continue
+                        received += len(chunk)
+                        if received > self.MAX_AUDIO_BYTES:
+                            raise BackendUnavailable("Qwen3-TTS WAV exceeds the size limit")
+                        output.write(chunk)
+        except BackendUnavailable:
+            destination.unlink(missing_ok=True)
+            raise
+        except (OSError, requests.RequestException) as exc:
+            destination.unlink(missing_ok=True)
+            raise BackendUnavailable(f"Qwen3-TTS synthesis failed: {exc}") from exc
+        return inspect_pcm16_wav(destination)
+
+    def health(self) -> tuple[bool, str]:
+        try:
+            response = requests.get(f"{self.base_url}/health", timeout=3.0)
+            response.raise_for_status()
+            payload = response.json()
+        except (ValueError, requests.RequestException) as exc:
+            return False, f"Qwen3-TTS service unavailable: {exc}"
+        return True, str(payload.get("detail", "Qwen3-TTS service ready"))

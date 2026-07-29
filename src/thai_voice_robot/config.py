@@ -52,6 +52,8 @@ class ServerSettings:
     mms_noise_scale: float = 0.55
     mms_noise_scale_duration: float = 0.65
     mms_seed: int = 555
+    qwen_tts_url: str = "http://127.0.0.1:5055"
+    qwen_tts_timeout_seconds: float = 300.0
     espeak_voice: str = "th"
     espeak_speed: int = 155
     audio_dir: Path = field(default_factory=lambda: PROJECT_ROOT / "data" / "audio")
@@ -90,6 +92,12 @@ class ServerSettings:
                 "NONG_YOONG_MMS_NOISE_SCALE_DURATION", 0.65
             ),
             mms_seed=_env_int("NONG_YOONG_MMS_SEED", 555),
+            qwen_tts_url=os.getenv(
+                "NONG_YOONG_QWEN_TTS_URL", "http://127.0.0.1:5055"
+            ).rstrip("/"),
+            qwen_tts_timeout_seconds=_env_float(
+                "NONG_YOONG_QWEN_TTS_TIMEOUT", 300.0
+            ),
             espeak_voice=os.getenv("NONG_YOONG_ESPEAK_VOICE", "th"),
             espeak_speed=_env_int("NONG_YOONG_ESPEAK_SPEED", 155),
             audio_dir=_env_path(

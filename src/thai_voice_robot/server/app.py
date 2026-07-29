@@ -23,6 +23,7 @@ from thai_voice_robot.server.store import ConversationStore
 from thai_voice_robot.server.tts import (
     EspeakThaiTTS,
     MmsThaiTTS,
+    QwenThaiTTS,
 )
 from thai_voice_robot.server.worker import SerializedWorker
 
@@ -70,6 +71,10 @@ def _build_service(settings: ServerSettings) -> ResponseService:
             settings.mms_noise_scale,
             settings.mms_noise_scale_duration,
             settings.mms_seed,
+        )
+    elif settings.tts_backend == "qwen":
+        tts = QwenThaiTTS(
+            settings.qwen_tts_url, settings.qwen_tts_timeout_seconds
         )
     else:
         raise ValueError(f"unsupported TTS backend: {settings.tts_backend}")

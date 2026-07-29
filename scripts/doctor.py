@@ -8,6 +8,8 @@ import platform
 import shutil
 import sys
 
+import requests
+
 from thai_voice_robot.config import ClientSettings, ServerSettings
 from thai_voice_robot.client.stt import ThaiZipformerRecognizer
 
@@ -38,6 +40,12 @@ def main() -> None:
     checks["Thai STT model"] = all(
         (client.stt_model_dir / filename).is_file() for filename in model_files
     )
+    if server.tts_backend == "qwen":
+        try:
+            response = requests.get(f"{server.qwen_tts_url}/health", timeout=3.0)
+            checks["Qwen3-TTS sidecar"] = response.status_code == 200
+        except requests.RequestException:
+            checks["Qwen3-TTS sidecar"] = False
     print(f"Platform: {platform.platform()}")
     print(f"Server URL: {client.server_url}")
     print(f"Ollama: {server.ollama_url} model={server.ollama_model}")

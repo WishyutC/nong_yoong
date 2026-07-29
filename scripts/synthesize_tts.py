@@ -7,7 +7,7 @@ import argparse
 from pathlib import Path
 
 from thai_voice_robot.config import ServerSettings
-from thai_voice_robot.server.tts import EspeakThaiTTS, MmsThaiTTS
+from thai_voice_robot.server.tts import EspeakThaiTTS, MmsThaiTTS, QwenThaiTTS
 
 
 def parse_args() -> argparse.Namespace:
@@ -18,12 +18,12 @@ def parse_args() -> argparse.Namespace:
         default="สวัสดีครับ ฉันคือน้องยูง ผู้ช่วยภาษาไทยของคุณ",
     )
     parser.add_argument(
-        "--backend", choices=("mms", "espeak"), default="mms"
+        "--backend", choices=("qwen", "mms", "espeak"), default="qwen"
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("data/tts_samples/mms-thai.wav"),
+        default=Path("data/tts_samples/qwen3-thai.wav"),
     )
     parser.add_argument("--model", default="facebook/mms-tts-tha")
     return parser.parse_args()
@@ -32,7 +32,11 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     settings = ServerSettings.from_env()
-    if args.backend == "mms":
+    if args.backend == "qwen":
+        backend = QwenThaiTTS(
+            settings.qwen_tts_url, settings.qwen_tts_timeout_seconds
+        )
+    elif args.backend == "mms":
         backend = MmsThaiTTS(
             args.model,
             settings.mms_speaking_rate,

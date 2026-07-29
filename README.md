@@ -23,6 +23,7 @@ move directly from `IDLE` to `THINKING` for setup and API testing.
 
 - Versioned FastAPI server with liveness and dependency readiness checks
 - Ollama `/api/chat` integration with `gemma3:12b` as the default model
+- Qwen3-TTS 1.7B voice cloning on the workstation GPU
 - Tunable MMS neural Thai TTS and a lightweight eSpeak NG fallback
 - Final mono PCM16 WAV generation and bounded-chunk HTTP delivery
 - UUID request idempotency and session-scoped LLM conversation history
@@ -68,6 +69,10 @@ ollama pull gemma3:12b
 Start the API:
 
 ```bash
+# Terminal 1: load Qwen3-TTS once and keep it resident on the GPU
+.venv-qwen-tts/bin/python scripts/qwen_tts_sidecar.py
+
+# Terminal 2: start the robot API
 .venv/bin/nong-yoong-server
 ```
 
@@ -83,12 +88,22 @@ For a deterministic test when Ollama is unavailable, temporarily set
 
 ### Thai TTS
 
-Test MMS without starting the main API:
+Qwen3-TTS runs in `.venv-qwen-tts` so its CUDA dependencies do not affect the
+main API or the Pi. It uses `Qwen/Qwen3-TTS-12Hz-1.7B-Base`. Set
+`NONG_YOONG_QWEN_TTS_REF_AUDIO` to a clear 5–15 second Thai WAV and set
+`NONG_YOONG_QWEN_TTS_REF_TEXT` to its exact transcript. Only clone a voice when
+its owner has consented.
+
+After starting the Qwen3-TTS sidecar, generate a direct test:
 
 ```bash
 .venv/bin/python scripts/synthesize_tts.py
-aplay data/tts_samples/mms-thai.wav
+ffplay -nodisp -autoexit data/tts_samples/qwen3-thai.wav
 ```
+
+The first sidecar start downloads the 1.7B model. On supported NVIDIA hardware,
+the setup installs a CUDA 12.8 PyTorch build. The default SDPA attention backend
+does not require compiling FlashAttention.
 
 MMS Thai exposes its VITS inference controls through `.env`. The tuned defaults
 are a slightly slower `NONG_YOONG_MMS_SPEAKING_RATE=0.95`, clearer
@@ -96,13 +111,15 @@ are a slightly slower `NONG_YOONG_MMS_SPEAKING_RATE=0.95`, clearer
 fixed seed of `555` for repeatable speech. Restart the workstation API after
 changing any of these values.
 
-The MMS model is CC-BY-NC-4.0 and is not appropriate for commercial use without
-permission. Select `mms` or `espeak` through `NONG_YOONG_TTS_BACKEND`.
+The MMS fallback is CC-BY-NC-4.0 and is not appropriate for commercial use
+without permission. Select `qwen`, `mms`, or `espeak` through
+`NONG_YOONG_TTS_BACKEND`.
 
-For systemd deployment, install and start the workstation API unit:
+For systemd deployment, install both workstation units and start the API unit:
 
 ```bash
-sudo cp deploy/nong-yoong-server.service /etc/systemd/system/
+sudo cp deploy/nong-yoong-qwen-tts.service deploy/nong-yoong-server.service \
+  /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now nong-yoong-server.service
 ```
