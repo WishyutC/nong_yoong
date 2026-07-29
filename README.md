@@ -23,8 +23,8 @@ move directly from `IDLE` to `THINKING` for setup and API testing.
 
 - Versioned FastAPI server with liveness and dependency readiness checks
 - Ollama `/api/chat` integration with `gemma3:12b` as the default model
-- Thai eSpeak NG TTS that works immediately on the workstation
-- Optional higher-quality `facebook/mms-tts-tha` neural TTS
+- Neural `facebook/mms-tts-tha` Thai TTS on the workstation
+- Lightweight Thai eSpeak NG emergency fallback
 - Final mono PCM16 WAV generation and bounded-chunk HTTP delivery
 - UUID request idempotency and session-scoped LLM conversation history
 - Structured SQLite events, real dashboard counts, and audio references
@@ -83,17 +83,21 @@ nong-yoong-client --once "สวัสดี น้องยูง" --no-playbac
 For a deterministic test when Ollama is unavailable, temporarily set
 `NONG_YOONG_LLM_BACKEND=echo` in `.env`.
 
-### Optional neural Thai TTS
+### Thai TTS
+
+The workstation setup installs the CPU-only neural runtime and selects MMS in
+`.env.workstation.example`. Its `facebook/mms-tts-tha` weights download on the
+first synthesis and are then cached for offline use. Test the voice without
+starting the server:
 
 ```bash
-.venv/bin/python -m pip install -e '.[mms]'
+.venv/bin/python scripts/synthesize_tts.py
+aplay data/tts_samples/mms-thai.wav
 ```
 
-Then set `NONG_YOONG_TTS_BACKEND=mms`. The configured
-`facebook/mms-tts-tha` weights download on first use. This model is
-CC-BY-NC-4.0 and is not appropriate for commercial use without permission.
-The default eSpeak backend has a robotic voice but is lightweight and works
-offline.
+This model is CC-BY-NC-4.0 and is not appropriate for commercial use without
+permission. Set `NONG_YOONG_TTS_BACKEND=espeak` for a lightweight, fully local
+emergency fallback; that voice is intentionally more robotic.
 
 ## Raspberry Pi setup
 

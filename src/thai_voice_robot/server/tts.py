@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import wave
 from dataclasses import dataclass
+from importlib.util import find_spec
 from pathlib import Path
 from threading import Lock
 from typing import Protocol
@@ -95,27 +96,45 @@ class MmsThaiTTS:
 
     def __init__(self, model_name: str = "facebook/mms-tts-tha") -> None:
         self.model_name = model_name
-        self._pipeline = None
+        self._model = None
+        self._tokenizer = None
         self._lock = Lock()
 
     def _load(self):
         with self._lock:
-            if self._pipeline is None:
+            if self._model is None or self._tokenizer is None:
                 try:
-                    from transformers import pipeline
+                    from transformers import AutoTokenizer, VitsModel
 
-                    self._pipeline = pipeline("text-to-speech", model=self.model_name)
+                    try:
+                        tokenizer = AutoTokenizer.from_pretrained(
+                            self.model_name, local_files_only=True
+                        )
+                        model = VitsModel.from_pretrained(
+                            self.model_name, local_files_only=True
+                        )
+                    except OSError:
+                        tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+                        model = VitsModel.from_pretrained(self.model_name)
+                    self._tokenizer = tokenizer
+                    self._model = model.eval()
                 except Exception as exc:
                     raise BackendUnavailable(f"could not load MMS Thai TTS: {exc}") from exc
-            return self._pipeline
+            return self._tokenizer, self._model
 
     def synthesize(self, text: str, destination: Path) -> WavInfo:
         try:
             import numpy as np
+            import torch
 
-            result = self._load()(text)
-            samples = np.asarray(result["audio"], dtype=np.float32).reshape(-1)
-            sample_rate = int(result["sampling_rate"])
+            tokenizer, model = self._load()
+            inputs = tokenizer(text, return_tensors="pt")
+            with torch.inference_mode():
+                waveform = model(**inputs).waveform
+            samples = np.asarray(
+                waveform.squeeze().detach().cpu().numpy(), dtype=np.float32
+            ).reshape(-1)
+            sample_rate = int(model.config.sampling_rate)
             samples = np.clip(samples, -1.0, 1.0)
             pcm = (samples * 32767.0).astype("<i2").tobytes()
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -131,6 +150,13 @@ class MmsThaiTTS:
         return inspect_pcm16_wav(destination)
 
     def health(self) -> tuple[bool, str]:
-        if self._pipeline is None:
+        missing = [name for name in ("torch", "transformers") if find_spec(name) is None]
+        if missing:
+            return False, (
+                "MMS dependencies missing: "
+                + ", ".join(missing)
+                + "; install the mms optional dependencies"
+            )
+        if self._model is None:
             return True, f"MMS model {self.model_name} configured; lazy load pending"
         return True, f"MMS model {self.model_name} loaded"
