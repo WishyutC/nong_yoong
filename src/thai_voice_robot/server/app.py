@@ -65,7 +65,13 @@ def _build_service(settings: ServerSettings) -> ResponseService:
     if settings.tts_backend == "espeak":
         tts = EspeakThaiTTS(settings.espeak_voice, settings.espeak_speed)
     elif settings.tts_backend == "mms":
-        tts = MmsThaiTTS(settings.mms_model)
+        tts = MmsThaiTTS(
+            settings.mms_model,
+            settings.mms_speaking_rate,
+            settings.mms_noise_scale,
+            settings.mms_noise_scale_duration,
+            settings.mms_seed,
+        )
     elif settings.tts_backend == "thonburian":
         tts = ThonburianThaiTTS(
             settings.thonburian_url, settings.thonburian_timeout_seconds

@@ -48,6 +48,10 @@ class ServerSettings:
     llm_backend: str = "ollama"
     tts_backend: str = "espeak"
     mms_model: str = "facebook/mms-tts-tha"
+    mms_speaking_rate: float = 0.95
+    mms_noise_scale: float = 0.55
+    mms_noise_scale_duration: float = 0.65
+    mms_seed: int = 555
     thonburian_url: str = "http://127.0.0.1:5055"
     thonburian_timeout_seconds: float = 300.0
     espeak_voice: str = "th"
@@ -82,6 +86,12 @@ class ServerSettings:
             llm_backend=os.getenv("NONG_YOONG_LLM_BACKEND", "ollama").lower(),
             tts_backend=os.getenv("NONG_YOONG_TTS_BACKEND", "espeak").lower(),
             mms_model=os.getenv("NONG_YOONG_MMS_MODEL", "facebook/mms-tts-tha"),
+            mms_speaking_rate=_env_float("NONG_YOONG_MMS_SPEAKING_RATE", 0.95),
+            mms_noise_scale=_env_float("NONG_YOONG_MMS_NOISE_SCALE", 0.55),
+            mms_noise_scale_duration=_env_float(
+                "NONG_YOONG_MMS_NOISE_SCALE_DURATION", 0.65
+            ),
+            mms_seed=_env_int("NONG_YOONG_MMS_SEED", 555),
             thonburian_url=os.getenv(
                 "NONG_YOONG_THONBURIAN_URL", "http://127.0.0.1:5055"
             ).rstrip("/"),

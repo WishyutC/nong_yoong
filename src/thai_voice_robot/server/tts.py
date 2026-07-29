@@ -96,11 +96,36 @@ class MmsThaiTTS:
     commercial deployment without appropriate permission.
     """
 
-    def __init__(self, model_name: str = "facebook/mms-tts-tha") -> None:
+    def __init__(
+        self,
+        model_name: str = "facebook/mms-tts-tha",
+        speaking_rate: float = 0.95,
+        noise_scale: float = 0.55,
+        noise_scale_duration: float = 0.65,
+        seed: int = 555,
+    ) -> None:
+        if not 0.5 <= speaking_rate <= 2.0:
+            raise ValueError("MMS speaking rate must be between 0.5 and 2.0")
+        if not 0.0 <= noise_scale <= 2.0:
+            raise ValueError("MMS noise scale must be between 0.0 and 2.0")
+        if not 0.0 <= noise_scale_duration <= 2.0:
+            raise ValueError("MMS duration noise must be between 0.0 and 2.0")
+        if seed < 0:
+            raise ValueError("MMS seed must be zero or greater")
         self.model_name = model_name
+        self.speaking_rate = speaking_rate
+        self.noise_scale = noise_scale
+        self.noise_scale_duration = noise_scale_duration
+        self.seed = seed
         self._model = None
         self._tokenizer = None
         self._lock = Lock()
+
+    def _configure_model(self, model):
+        model.speaking_rate = self.speaking_rate
+        model.noise_scale = self.noise_scale
+        model.noise_scale_duration = self.noise_scale_duration
+        return model.eval()
 
     def _load(self):
         with self._lock:
@@ -119,7 +144,7 @@ class MmsThaiTTS:
                         tokenizer = AutoTokenizer.from_pretrained(self.model_name)
                         model = VitsModel.from_pretrained(self.model_name)
                     self._tokenizer = tokenizer
-                    self._model = model.eval()
+                    self._model = self._configure_model(model)
                 except Exception as exc:
                     raise BackendUnavailable(f"could not load MMS Thai TTS: {exc}") from exc
             return self._tokenizer, self._model
@@ -131,8 +156,11 @@ class MmsThaiTTS:
 
             tokenizer, model = self._load()
             inputs = tokenizer(text, return_tensors="pt")
+            torch.manual_seed(self.seed)
             with torch.inference_mode():
-                waveform = model(**inputs).waveform
+                waveform = model(
+                    **inputs, speaking_rate=self.speaking_rate
+                ).waveform
             samples = np.asarray(
                 waveform.squeeze().detach().cpu().numpy(), dtype=np.float32
             ).reshape(-1)
@@ -160,8 +188,14 @@ class MmsThaiTTS:
                 + "; install the mms optional dependencies"
             )
         if self._model is None:
-            return True, f"MMS model {self.model_name} configured; lazy load pending"
-        return True, f"MMS model {self.model_name} loaded"
+            state = "configured; lazy load pending"
+        else:
+            state = "loaded"
+        return True, (
+            f"MMS model {self.model_name} {state}; rate={self.speaking_rate}, "
+            f"noise={self.noise_scale}, duration_noise={self.noise_scale_duration}, "
+            f"seed={self.seed}"
+        )
 
 
 class ThonburianThaiTTS:

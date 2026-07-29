@@ -37,7 +37,13 @@ def main() -> None:
             settings.thonburian_url, settings.thonburian_timeout_seconds
         )
     elif args.backend == "mms":
-        backend = MmsThaiTTS(args.model)
+        backend = MmsThaiTTS(
+            args.model,
+            settings.mms_speaking_rate,
+            settings.mms_noise_scale,
+            settings.mms_noise_scale_duration,
+            settings.mms_seed,
+        )
     else:
         backend = EspeakThaiTTS()
     output = args.output.expanduser().resolve()

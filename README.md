@@ -112,6 +112,12 @@ through `NONG_YOONG_THONBURIAN_REF_AUDIO` and
 `NONG_YOONG_THONBURIAN_REF_TEXT`. Do not clone another person's voice without
 their permission.
 
+MMS Thai exposes its VITS inference controls through `.env`. The tuned defaults
+are a slightly slower `NONG_YOONG_MMS_SPEAKING_RATE=0.95`, clearer
+`NONG_YOONG_MMS_NOISE_SCALE=0.55`, steadier duration noise of `0.65`, and a
+fixed seed of `555` for repeatable speech. Restart the workstation API after
+changing any of these values.
+
 Thonburian's code is MIT, while its model is CC-BY-NC-SA-4.0 and is not
 appropriate for commercial use without permission. The smaller MMS fallback is
 CC-BY-NC-4.0. Select `mms` or `espeak` through `NONG_YOONG_TTS_BACKEND` if the
