@@ -23,7 +23,6 @@ from thai_voice_robot.server.store import ConversationStore
 from thai_voice_robot.server.tts import (
     EspeakThaiTTS,
     MmsThaiTTS,
-    ThonburianThaiTTS,
 )
 from thai_voice_robot.server.worker import SerializedWorker
 
@@ -71,10 +70,6 @@ def _build_service(settings: ServerSettings) -> ResponseService:
             settings.mms_noise_scale,
             settings.mms_noise_scale_duration,
             settings.mms_seed,
-        )
-    elif settings.tts_backend == "thonburian":
-        tts = ThonburianThaiTTS(
-            settings.thonburian_url, settings.thonburian_timeout_seconds
         )
     else:
         raise ValueError(f"unsupported TTS backend: {settings.tts_backend}")

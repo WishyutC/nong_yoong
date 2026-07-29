@@ -23,9 +23,7 @@ move directly from `IDLE` to `THINKING` for setup and API testing.
 
 - Versioned FastAPI server with liveness and dependency readiness checks
 - Ollama `/api/chat` integration with `gemma3:12b` as the default model
-- Natural, reference-conditioned Thonburian F5-TTS in an isolated workstation
-  service
-- Smaller MMS neural TTS and lightweight eSpeak NG fallbacks
+- Tunable MMS neural Thai TTS and a lightweight eSpeak NG fallback
 - Final mono PCM16 WAV generation and bounded-chunk HTTP delivery
 - UUID request idempotency and session-scoped LLM conversation history
 - Structured SQLite events, real dashboard counts, and audio references
@@ -70,10 +68,6 @@ ollama pull gemma3:12b
 Start the API:
 
 ```bash
-# Terminal 1: load the Thai voice once and keep it resident
-.venv-thonburian/bin/python scripts/thonburian_sidecar.py
-
-# Terminal 2: start the robot API
 .venv/bin/nong-yoong-server
 ```
 
@@ -89,28 +83,12 @@ For a deterministic test when Ollama is unavailable, temporarily set
 
 ### Thai TTS
 
-The workstation setup creates two Python 3.11 environments. `.venv` contains
-the robot API; `.venv-thonburian` isolates F5-TTS and its heavier dependencies.
-It downloads the pinned official source and preloads the approximately 1.35 GB
-checkpoint. The main server talks only to its localhost sidecar, so none of the
-Thonburian dependencies or audio data reach the Pi.
-
-After starting the sidecar, test the selected voice without starting the main
-API:
+Test MMS without starting the main API:
 
 ```bash
 .venv/bin/python scripts/synthesize_tts.py
-aplay data/tts_samples/thonburian-thai.wav
+aplay data/tts_samples/mms-thai.wav
 ```
-
-The default `NONG_YOONG_THONBURIAN_NFE_STEP=32` uses Thonburian's high-quality
-setting; reduce it to `16` if CPU synthesis is too slow. The sidecar also
-normalizes the floating-point waveform to `-3 dBFS` before PCM16 encoding to
-prevent hard clipping. A clear
-3–10 second reference WAV and exact transcript can replace the bundled example
-through `NONG_YOONG_THONBURIAN_REF_AUDIO` and
-`NONG_YOONG_THONBURIAN_REF_TEXT`. Do not clone another person's voice without
-their permission.
 
 MMS Thai exposes its VITS inference controls through `.env`. The tuned defaults
 are a slightly slower `NONG_YOONG_MMS_SPEAKING_RATE=0.95`, clearer
@@ -118,17 +96,13 @@ are a slightly slower `NONG_YOONG_MMS_SPEAKING_RATE=0.95`, clearer
 fixed seed of `555` for repeatable speech. Restart the workstation API after
 changing any of these values.
 
-Thonburian's code is MIT, while its model is CC-BY-NC-SA-4.0 and is not
-appropriate for commercial use without permission. The smaller MMS fallback is
-CC-BY-NC-4.0. Select `mms` or `espeak` through `NONG_YOONG_TTS_BACKEND` if the
-sidecar is unavailable.
+The MMS model is CC-BY-NC-4.0 and is not appropriate for commercial use without
+permission. Select `mms` or `espeak` through `NONG_YOONG_TTS_BACKEND`.
 
-For systemd deployment, install both workstation units and start the API unit;
-it declares the Thonburian sidecar as a dependency:
+For systemd deployment, install and start the workstation API unit:
 
 ```bash
-sudo cp deploy/nong-yoong-thonburian.service deploy/nong-yoong-server.service \
-  /etc/systemd/system/
+sudo cp deploy/nong-yoong-server.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now nong-yoong-server.service
 ```
