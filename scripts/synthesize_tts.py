@@ -6,7 +6,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from thai_voice_robot.server.tts import EspeakThaiTTS, MmsThaiTTS
+from thai_voice_robot.config import ServerSettings
+from thai_voice_robot.server.tts import EspeakThaiTTS, MmsThaiTTS, ThonburianThaiTTS
 
 
 def parse_args() -> argparse.Namespace:
@@ -16,11 +17,13 @@ def parse_args() -> argparse.Namespace:
         nargs="?",
         default="สวัสดีครับ ฉันคือน้องยูง ผู้ช่วยภาษาไทยของคุณ",
     )
-    parser.add_argument("--backend", choices=("mms", "espeak"), default="mms")
+    parser.add_argument(
+        "--backend", choices=("thonburian", "mms", "espeak"), default="thonburian"
+    )
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("data/tts_samples/mms-thai.wav"),
+        default=Path("data/tts_samples/thonburian-thai.wav"),
     )
     parser.add_argument("--model", default="facebook/mms-tts-tha")
     return parser.parse_args()
@@ -28,7 +31,15 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    backend = MmsThaiTTS(args.model) if args.backend == "mms" else EspeakThaiTTS()
+    settings = ServerSettings.from_env()
+    if args.backend == "thonburian":
+        backend = ThonburianThaiTTS(
+            settings.thonburian_url, settings.thonburian_timeout_seconds
+        )
+    elif args.backend == "mms":
+        backend = MmsThaiTTS(args.model)
+    else:
+        backend = EspeakThaiTTS()
     output = args.output.expanduser().resolve()
     info = backend.synthesize(args.text, output)
     print(

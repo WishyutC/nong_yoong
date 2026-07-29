@@ -23,8 +23,9 @@ move directly from `IDLE` to `THINKING` for setup and API testing.
 
 - Versioned FastAPI server with liveness and dependency readiness checks
 - Ollama `/api/chat` integration with `gemma3:12b` as the default model
-- Neural `facebook/mms-tts-tha` Thai TTS on the workstation
-- Lightweight Thai eSpeak NG emergency fallback
+- Natural, reference-conditioned Thonburian F5-TTS in an isolated workstation
+  service
+- Smaller MMS neural TTS and lightweight eSpeak NG fallbacks
 - Final mono PCM16 WAV generation and bounded-chunk HTTP delivery
 - UUID request idempotency and session-scoped LLM conversation history
 - Structured SQLite events, real dashboard counts, and audio references
@@ -69,8 +70,11 @@ ollama pull gemma3:12b
 Start the API:
 
 ```bash
-source .venv/bin/activate
-nong-yoong-server
+# Terminal 1: load the Thai voice once and keep it resident
+.venv-thonburian/bin/python scripts/thonburian_sidecar.py
+
+# Terminal 2: start the robot API
+.venv/bin/nong-yoong-server
 ```
 
 Smoke-test it from another terminal without a microphone or speaker:
@@ -85,19 +89,41 @@ For a deterministic test when Ollama is unavailable, temporarily set
 
 ### Thai TTS
 
-The workstation setup installs the CPU-only neural runtime and selects MMS in
-`.env.workstation.example`. Its `facebook/mms-tts-tha` weights download on the
-first synthesis and are then cached for offline use. Test the voice without
-starting the server:
+The workstation setup creates two Python 3.11 environments. `.venv` contains
+the robot API; `.venv-thonburian` isolates F5-TTS and its heavier dependencies.
+It downloads the pinned official source and preloads the approximately 1.35 GB
+checkpoint. The main server talks only to its localhost sidecar, so none of the
+Thonburian dependencies or audio data reach the Pi.
+
+After starting the sidecar, test the selected voice without starting the main
+API:
 
 ```bash
 .venv/bin/python scripts/synthesize_tts.py
-aplay data/tts_samples/mms-thai.wav
+aplay data/tts_samples/thonburian-thai.wav
 ```
 
-This model is CC-BY-NC-4.0 and is not appropriate for commercial use without
-permission. Set `NONG_YOONG_TTS_BACKEND=espeak` for a lightweight, fully local
-emergency fallback; that voice is intentionally more robotic.
+The default `NONG_YOONG_THONBURIAN_NFE_STEP=8` is a CPU latency/quality balance;
+increase it to `16` or `32` for higher-quality but slower synthesis. A clear
+3–10 second reference WAV and exact transcript can replace the bundled example
+through `NONG_YOONG_THONBURIAN_REF_AUDIO` and
+`NONG_YOONG_THONBURIAN_REF_TEXT`. Do not clone another person's voice without
+their permission.
+
+Thonburian's code is MIT, while its model is CC-BY-NC-SA-4.0 and is not
+appropriate for commercial use without permission. The smaller MMS fallback is
+CC-BY-NC-4.0. Select `mms` or `espeak` through `NONG_YOONG_TTS_BACKEND` if the
+sidecar is unavailable.
+
+For systemd deployment, install both workstation units and start the API unit;
+it declares the Thonburian sidecar as a dependency:
+
+```bash
+sudo cp deploy/nong-yoong-thonburian.service deploy/nong-yoong-server.service \
+  /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now nong-yoong-server.service
+```
 
 ## Raspberry Pi setup
 

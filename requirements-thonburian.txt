@@ -1,0 +1,5 @@
+# Isolated Thonburian sidecar environment. PyTorch CPU wheels are installed
+# separately by scripts/setup_thonburian.sh.
+f5-tts==1.1.16
+python-dotenv==1.2.2
+pythainlp==5.3.4

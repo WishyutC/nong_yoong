@@ -1,0 +1,16 @@
+[Unit]
+Description=Nong Yoong isolated Thonburian Thai TTS service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=titan
+WorkingDirectory=/home/titan/nong_yoong
+EnvironmentFile=-/home/titan/nong_yoong/.env
+ExecStart=/home/titan/nong_yoong/.venv-thonburian/bin/python /home/titan/nong_yoong/scripts/thonburian_sidecar.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

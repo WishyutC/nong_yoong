@@ -1,7 +1,7 @@
 [Unit]
 Description=Nong Yoong workstation voice API
-After=network-online.target ollama.service
-Wants=network-online.target
+After=network-online.target ollama.service nong-yoong-thonburian.service
+Wants=network-online.target nong-yoong-thonburian.service
 
 [Service]
 Type=simple

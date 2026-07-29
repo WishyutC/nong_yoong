@@ -48,6 +48,8 @@ class ServerSettings:
     llm_backend: str = "ollama"
     tts_backend: str = "espeak"
     mms_model: str = "facebook/mms-tts-tha"
+    thonburian_url: str = "http://127.0.0.1:5055"
+    thonburian_timeout_seconds: float = 300.0
     espeak_voice: str = "th"
     espeak_speed: int = 155
     audio_dir: Path = field(default_factory=lambda: PROJECT_ROOT / "data" / "audio")
@@ -80,6 +82,12 @@ class ServerSettings:
             llm_backend=os.getenv("NONG_YOONG_LLM_BACKEND", "ollama").lower(),
             tts_backend=os.getenv("NONG_YOONG_TTS_BACKEND", "espeak").lower(),
             mms_model=os.getenv("NONG_YOONG_MMS_MODEL", "facebook/mms-tts-tha"),
+            thonburian_url=os.getenv(
+                "NONG_YOONG_THONBURIAN_URL", "http://127.0.0.1:5055"
+            ).rstrip("/"),
+            thonburian_timeout_seconds=_env_float(
+                "NONG_YOONG_THONBURIAN_TIMEOUT", 300.0
+            ),
             espeak_voice=os.getenv("NONG_YOONG_ESPEAK_VOICE", "th"),
             espeak_speed=_env_int("NONG_YOONG_ESPEAK_SPEED", 155),
             audio_dir=_env_path(
