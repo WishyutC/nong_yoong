@@ -40,7 +40,7 @@ def main() -> None:
     player = (
         NullAudioPlayer()
         if args.no_playback or not settings.playback_enabled
-        else SystemAudioPlayer(settings.output_device)
+        else SystemAudioPlayer(settings.output_device, settings.audio_player)
     )
     voice_mode = mode in {"keyboard", "wake"}
     robot = VoiceRobot(

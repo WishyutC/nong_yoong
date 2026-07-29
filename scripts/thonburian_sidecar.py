@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import shutil
 import sys
@@ -45,9 +46,12 @@ VOCAB_FILE = os.getenv(
     "hf://biodatlab/ThonburianTTS/megaF5/mega_vocab.txt",
 )
 DEVICE = os.getenv("NONG_YOONG_THONBURIAN_DEVICE", "auto")
-NFE_STEP = int(os.getenv("NONG_YOONG_THONBURIAN_NFE_STEP", "8"))
+NFE_STEP = int(os.getenv("NONG_YOONG_THONBURIAN_NFE_STEP", "32"))
 CFG_STRENGTH = float(os.getenv("NONG_YOONG_THONBURIAN_CFG", "2.5"))
 SPEED = float(os.getenv("NONG_YOONG_THONBURIAN_SPEED", "1.0"))
+TARGET_PEAK_DBFS = float(
+    os.getenv("NONG_YOONG_THONBURIAN_TARGET_PEAK_DBFS", "-3.0")
+)
 TEMP_DIR = Path(
     os.getenv(
         "NONG_YOONG_THONBURIAN_TEMP",
@@ -59,8 +63,51 @@ if not 4 <= NFE_STEP <= 64:
     raise ValueError("NONG_YOONG_THONBURIAN_NFE_STEP must be between 4 and 64")
 if SPEED <= 0:
     raise ValueError("NONG_YOONG_THONBURIAN_SPEED must be greater than zero")
+if not -12.0 <= TARGET_PEAK_DBFS <= -0.1:
+    raise ValueError(
+        "NONG_YOONG_THONBURIAN_TARGET_PEAK_DBFS must be between -12 and -0.1"
+    )
 
 os.environ.setdefault("MPLCONFIGDIR", str(TEMP_DIR / "matplotlib"))
+
+
+def install_safe_wav_export(model: Any) -> None:
+    """Write the float waveform without letting the PCM16 encoder hard-clip it."""
+
+    import numpy as np
+    import soundfile as sf
+
+    target_peak = 10.0 ** (TARGET_PEAK_DBFS / 20.0)
+
+    def export_wav(
+        wav: Any, file_wave: str, remove_silence: bool = False
+    ) -> None:
+        samples = np.asarray(wav, dtype=np.float32)
+        if samples.size == 0:
+            raise RuntimeError("Thonburian generated an empty waveform")
+        if not np.isfinite(samples).all():
+            raise RuntimeError("Thonburian generated non-finite audio samples")
+
+        source_peak = float(np.max(np.abs(samples)))
+        if not math.isfinite(source_peak) or source_peak <= 0.0:
+            raise RuntimeError("Thonburian generated silent or invalid audio")
+        if source_peak > target_peak:
+            samples = samples * (target_peak / source_peak)
+
+        sf.write(
+            file_wave,
+            samples,
+            model.target_sample_rate,
+            subtype="PCM_16",
+        )
+        if remove_silence:
+            from flowtts.infer.utils_infer import remove_silence_for_generated_wav
+
+            remove_silence_for_generated_wav(file_wave)
+
+    # FlowTTS.infer calls this callback before quantizing the waveform. Replacing
+    # it here preserves the waveform shape and prevents irreversible clipping.
+    model.export_wav = export_wav
 
 
 class Engine:
@@ -107,6 +154,7 @@ class Engine:
             audio_config=audio_config,
             temp_dir=str(TEMP_DIR),
         )
+        install_safe_wav_export(self.pipeline.model)
 
     def synthesize(self, text: str, destination: Path) -> None:
         with self.lock:
@@ -144,7 +192,7 @@ class Handler(BaseHTTPRequestHandler):
                 "status": "ready",
                 "detail": (
                     f"ThonburianTTS loaded on {self.engine.device}; "
-                    f"NFE={NFE_STEP}, speed={SPEED}"
+                    f"NFE={NFE_STEP}, speed={SPEED}, peak={TARGET_PEAK_DBFS} dBFS"
                 ),
             },
         )
@@ -205,7 +253,10 @@ def main() -> None:
     args = parse_args()
     engine = Engine()
     engine.preload()
-    print(f"ThonburianTTS loaded on {engine.device} (NFE={NFE_STEP}, speed={SPEED})")
+    print(
+        f"ThonburianTTS loaded on {engine.device} "
+        f"(NFE={NFE_STEP}, speed={SPEED}, peak={TARGET_PEAK_DBFS} dBFS)"
+    )
     if args.preload:
         return
     Handler.engine = engine

@@ -132,6 +132,7 @@ class ClientSettings:
     wake_invert_probability: bool = True
     input_device: str | None = None
     output_device: str | None = None
+    audio_player: str = "auto"
 
     @classmethod
     def from_env(cls) -> ClientSettings:
@@ -166,4 +167,5 @@ class ClientSettings:
             wake_invert_probability=_env_bool("NONG_YOONG_WAKE_INVERT", True),
             input_device=os.getenv("NONG_YOONG_INPUT_DEVICE") or None,
             output_device=os.getenv("NONG_YOONG_OUTPUT_DEVICE") or None,
+            audio_player=os.getenv("NONG_YOONG_AUDIO_PLAYER", "auto").lower(),
         )

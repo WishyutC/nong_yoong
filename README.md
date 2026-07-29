@@ -103,8 +103,10 @@ API:
 aplay data/tts_samples/thonburian-thai.wav
 ```
 
-The default `NONG_YOONG_THONBURIAN_NFE_STEP=8` is a CPU latency/quality balance;
-increase it to `16` or `32` for higher-quality but slower synthesis. A clear
+The default `NONG_YOONG_THONBURIAN_NFE_STEP=32` uses Thonburian's high-quality
+setting; reduce it to `16` if CPU synthesis is too slow. The sidecar also
+normalizes the floating-point waveform to `-3 dBFS` before PCM16 encoding to
+prevent hard clipping. A clear
 3–10 second reference WAV and exact transcript can replace the bundled example
 through `NONG_YOONG_THONBURIAN_REF_AUDIO` and
 `NONG_YOONG_THONBURIAN_REF_TEXT`. Do not clone another person's voice without
@@ -164,6 +166,8 @@ nong-yoong-client --mode wake
 Use `NONG_YOONG_INPUT_DEVICE` and `NONG_YOONG_OUTPUT_DEVICE` in `.env` when the
 USB audio adapter is not the system default. Run `.venv/bin/python
 scripts/doctor.py` to check dependencies and model files.
+Playback defaults to FFplay under WSL to avoid direct ALSA resampling problems;
+set `NONG_YOONG_AUDIO_PLAYER=aplay` on the Pi when an ALSA device is required.
 
 ## API and data
 
