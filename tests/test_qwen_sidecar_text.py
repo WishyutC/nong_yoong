@@ -5,8 +5,8 @@ import unittest
 from pathlib import Path
 
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "qwen_tts_sidecar.py"
-SPEC = importlib.util.spec_from_file_location("qwen_tts_sidecar", SCRIPT)
+SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "qwen_sidecar_utils.py"
+SPEC = importlib.util.spec_from_file_location("qwen_sidecar_utils", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
@@ -40,14 +40,14 @@ class QwenSidecarTextTests(unittest.TestCase):
 
         self.assertEqual([len(chunk) for chunk in chunks], [60, 60, 60, 1])
 
-    def test_end_padding_adds_exact_silence_duration(self) -> None:
-        waveform = MODULE.np.ones(240, dtype=MODULE.np.float32)
+    def test_end_padding_uses_exact_silence_sample_count(self) -> None:
+        self.assertEqual(MODULE.silence_sample_count(24_000, 500), 12_000)
 
-        padded = MODULE.append_end_padding(waveform, 24_000, padding_ms=500)
-
-        self.assertEqual(len(padded), 12_240)
-        self.assertTrue(MODULE.np.all(padded[:240] == 1.0))
-        self.assertTrue(MODULE.np.all(padded[240:] == 0.0))
+    def test_invalid_silence_settings_are_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            MODULE.silence_sample_count(0, 500)
+        with self.assertRaises(ValueError):
+            MODULE.silence_sample_count(24_000, -1)
 
 
 if __name__ == "__main__":
