@@ -208,6 +208,48 @@ set `NONG_YOONG_AUDIO_PLAYER=aplay` on the Pi when an ALSA device is required.
 All endpoints above require the configured bearer token. `/health/live` is the
 only public endpoint and returns no model, conversation, or configuration data.
 
+### Authenticated curl example
+
+Read the token without placing it in shell history, then verify readiness:
+
+```bash
+read -rsp "Nong Yoong API token: " NONG_YOONG_API_TOKEN
+echo
+
+curl https://api.wishayutc.org/health/ready \
+  --header "Authorization: Bearer $NONG_YOONG_API_TOKEN"
+```
+
+Generate IDs and send one Thai conversation turn:
+
+```bash
+REQUEST_ID=$(python3 -c 'import uuid; print(uuid.uuid4())')
+SESSION_ID=$(python3 -c 'import uuid; print(uuid.uuid4())')
+
+curl https://api.wishayutc.org/v1/responses \
+  --header "Authorization: Bearer $NONG_YOONG_API_TOKEN" \
+  --header "Content-Type: application/json" \
+  --data "{
+    \"request_id\": \"$REQUEST_ID\",
+    \"session_id\": \"$SESSION_ID\",
+    \"text\": \"สวัสดี น้องยูง วันนี้เป็นอย่างไรบ้าง\",
+    \"language\": \"th\"
+  }"
+```
+
+Download and play the generated WAV:
+
+```bash
+curl "https://api.wishayutc.org/v1/audio/$REQUEST_ID.wav" \
+  --header "Authorization: Bearer $NONG_YOONG_API_TOKEN" \
+  --output nong-yoong-response.wav
+ffplay -nodisp -autoexit nong-yoong-response.wav
+```
+
+Create a new `REQUEST_ID` for every turn. Reuse `SESSION_ID` for follow-up
+questions so the server retains that conversation's context; generate a new
+session ID to start a separate conversation.
+
 The complete payload contract is in [docs/api-contract.md](docs/api-contract.md).
 
 ## Testing
