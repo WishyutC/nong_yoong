@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import tempfile
 import unicodedata
@@ -43,6 +44,9 @@ DTYPE = os.getenv("NONG_YOONG_QWEN_TTS_DTYPE", "bfloat16")
 ATTENTION = os.getenv("NONG_YOONG_QWEN_TTS_ATTN", "sdpa")
 LANGUAGE = os.getenv("NONG_YOONG_QWEN_TTS_LANGUAGE", "Auto")
 MAX_NEW_TOKENS = int(os.getenv("NONG_YOONG_QWEN_TTS_MAX_NEW_TOKENS", "2048"))
+SPEAKING_SPEED = float(os.getenv("NONG_YOONG_QWEN_TTS_SPEED", "0.90"))
+MAX_CHUNK_CHARS = int(os.getenv("NONG_YOONG_QWEN_TTS_MAX_CHUNK_CHARS", "160"))
+CHUNK_PAUSE_MS = int(os.getenv("NONG_YOONG_QWEN_TTS_CHUNK_PAUSE_MS", "180"))
 REFERENCE_AUDIO = env_path(
     "NONG_YOONG_QWEN_TTS_REF_AUDIO",
     PROJECT_ROOT / "data" / "tts_samples" / "mms-thai-optimized.wav",
@@ -57,19 +61,92 @@ TEMP_DIR = env_path(
 
 if not 128 <= MAX_NEW_TOKENS <= 4096:
     raise ValueError("NONG_YOONG_QWEN_TTS_MAX_NEW_TOKENS must be 128 to 4096")
+if not 0.75 <= SPEAKING_SPEED <= 1.25:
+    raise ValueError("NONG_YOONG_QWEN_TTS_SPEED must be between 0.75 and 1.25")
+if not 60 <= MAX_CHUNK_CHARS <= 500:
+    raise ValueError("NONG_YOONG_QWEN_TTS_MAX_CHUNK_CHARS must be 60 to 500")
+if not 0 <= CHUNK_PAUSE_MS <= 1000:
+    raise ValueError("NONG_YOONG_QWEN_TTS_CHUNK_PAUSE_MS must be 0 to 1000")
 
 os.environ.setdefault("MPLCONFIGDIR", str(TEMP_DIR / "matplotlib"))
 
 
 def clean_text(text: str) -> str:
-    """Drop emoji/control characters that can destabilize mixed-script generation."""
+    """Remove speech-hostile formatting while retaining sentence boundaries."""
 
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"[*_`#]+", "", text)
     kept = [
         character
         for character in text
-        if unicodedata.category(character) not in {"Cc", "Cf", "Cs", "Co", "So"}
+        if character == "\n"
+        or unicodedata.category(character) not in {"Cc", "Cf", "Cs", "Co", "So"}
     ]
-    return " ".join("".join(kept).split()).strip()
+    lines = [" ".join(line.split()) for line in "".join(kept).splitlines()]
+    return "\n".join(line for line in lines if line).strip()
+
+
+def _split_oversized_text(text: str, max_chars: int) -> list[str]:
+    """Split at spaces where possible, with a Unicode-safe hard limit fallback."""
+
+    if len(text) <= max_chars:
+        return [text]
+    words = text.split()
+    if len(words) > 1:
+        chunks: list[str] = []
+        current = ""
+        for word in words:
+            candidate = f"{current} {word}".strip()
+            if current and len(candidate) > max_chars:
+                chunks.extend(_split_oversized_text(current, max_chars))
+                current = word
+            else:
+                current = candidate
+        if current:
+            chunks.extend(_split_oversized_text(current, max_chars))
+        return chunks
+
+    chunks = []
+    remaining = text
+    while len(remaining) > max_chars:
+        cut = max_chars
+        while cut > max_chars - 8 and unicodedata.category(remaining[cut]).startswith("M"):
+            cut -= 1
+        chunks.append(remaining[:cut])
+        remaining = remaining[cut:]
+    if remaining:
+        chunks.append(remaining)
+    return chunks
+
+
+def split_text_chunks(text: str, max_chars: int = MAX_CHUNK_CHARS) -> list[str]:
+    """Create bounded synthesis units at formatting and sentence boundaries."""
+
+    cleaned = clean_text(text)
+    if not cleaned:
+        return []
+    segments: list[str] = []
+    # Newlines already preserve formatted list items. Avoid splitting on a
+    # period because numbered Thai/English lists commonly contain ``1.``.
+    sentence_boundary = re.compile(r"(?<=[!?。！？])\s+")
+    for line in cleaned.splitlines():
+        for sentence in sentence_boundary.split(line):
+            sentence = sentence.strip()
+            if sentence:
+                segments.extend(_split_oversized_text(sentence, max_chars))
+
+    chunks: list[str] = []
+    current = ""
+    for segment in segments:
+        candidate = f"{current} {segment}".strip()
+        if current and len(candidate) > max_chars:
+            chunks.append(current)
+            current = segment
+        else:
+            current = candidate
+    if current:
+        chunks.append(current)
+    return chunks
 
 
 def write_pcm16_wav(waveform: Any, sample_rate: int, destination: Path) -> None:
@@ -120,17 +197,39 @@ class Engine:
         )
 
     def synthesize(self, text: str, destination: Path) -> None:
-        safe_text = clean_text(text)
-        if not safe_text:
+        chunks = split_text_chunks(text)
+        if not chunks:
             raise ValueError("text contains no speakable characters")
+        generated: list[np.ndarray] = []
+        sample_rate: int | None = None
         with self.lock:
-            waveforms, sample_rate = self.model.generate_voice_clone(
-                text=safe_text,
-                language=LANGUAGE,
-                voice_clone_prompt=self.voice_prompt,
-                max_new_tokens=MAX_NEW_TOKENS,
-            )
-        write_pcm16_wav(waveforms[0], int(sample_rate), destination)
+            for chunk in chunks:
+                waveforms, chunk_sample_rate = self.model.generate_voice_clone(
+                    text=chunk,
+                    language=LANGUAGE,
+                    voice_clone_prompt=self.voice_prompt,
+                    max_new_tokens=MAX_NEW_TOKENS,
+                )
+                if sample_rate is None:
+                    sample_rate = int(chunk_sample_rate)
+                elif sample_rate != int(chunk_sample_rate):
+                    raise RuntimeError("Qwen3-TTS returned inconsistent sample rates")
+                generated.append(np.asarray(waveforms[0], dtype=np.float32).squeeze())
+
+        if sample_rate is None:
+            raise RuntimeError("Qwen3-TTS generated no audio chunks")
+        pause = np.zeros(int(sample_rate * CHUNK_PAUSE_MS / 1000), dtype=np.float32)
+        pieces: list[np.ndarray] = []
+        for index, waveform in enumerate(generated):
+            if index:
+                pieces.append(pause)
+            pieces.append(waveform)
+        combined = np.concatenate(pieces)
+        if SPEAKING_SPEED != 1.0:
+            import librosa
+
+            combined = librosa.effects.time_stretch(combined, rate=SPEAKING_SPEED)
+        write_pcm16_wav(combined, sample_rate, destination)
 
 
 def json_bytes(payload: dict[str, Any]) -> bytes:
@@ -154,7 +253,13 @@ class Handler(BaseHTTPRequestHandler):
             return
         self.send_json(
             200,
-            {"status": "ready", "detail": f"Qwen3-TTS {MODEL_ID} loaded on {DEVICE}"},
+            {
+                "status": "ready",
+                "detail": (
+                    f"Qwen3-TTS {MODEL_ID} loaded on {DEVICE}; "
+                    f"speed={SPEAKING_SPEED}, chunk={MAX_CHUNK_CHARS} chars"
+                ),
+            },
         )
 
     def do_POST(self) -> None:  # noqa: N802
@@ -213,7 +318,10 @@ def main() -> None:
     args = parse_args()
     engine = Engine()
     engine.preload()
-    print(f"Qwen3-TTS {MODEL_ID} loaded on {DEVICE}")
+    print(
+        f"Qwen3-TTS {MODEL_ID} loaded on {DEVICE} "
+        f"(speed={SPEAKING_SPEED}, chunk={MAX_CHUNK_CHARS} chars)"
+    )
     if args.preload:
         return
     if args.synthesize:

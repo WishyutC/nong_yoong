@@ -105,6 +105,13 @@ The first sidecar start downloads the 1.7B model. On supported NVIDIA hardware,
 the setup installs a CUDA 12.8 PyTorch build. The default SDPA attention backend
 does not require compiling FlashAttention.
 
+Long replies are synthesized in bounded sentence chunks to prevent truncated
+endings. `NONG_YOONG_QWEN_TTS_SPEED=0.90` makes playback ten percent slower
+without lowering pitch. Lower values speak more slowly; the supported range is
+`0.75` to `1.25`. Chunk size and the pause between chunks are controlled by
+`NONG_YOONG_QWEN_TTS_MAX_CHUNK_CHARS` and
+`NONG_YOONG_QWEN_TTS_CHUNK_PAUSE_MS`.
+
 MMS Thai exposes its VITS inference controls through `.env`. The tuned defaults
 are a slightly slower `NONG_YOONG_MMS_SPEAKING_RATE=0.95`, clearer
 `NONG_YOONG_MMS_NOISE_SCALE=0.55`, steadier duration noise of `0.65`, and a
