@@ -151,6 +151,10 @@ cp .env.pi.example .env
 .venv/bin/python scripts/download_models.py
 ```
 
+The Pi template sends API, health, and streamed-audio requests through
+`https://api.wishayutc.org`. Change `NONG_YOONG_SERVER_URL` in `.env` only if
+the tunnel hostname changes or the Pi should connect directly over the LAN.
+
 The downloader uses the official sherpa-onnx Thai model archive but extracts
 only the INT8 encoder/joiner, decoder, and token table needed at runtime.
 
