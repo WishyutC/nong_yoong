@@ -1,5 +1,7 @@
 # Nong Yoong Thai Voice Robot
 
+Current software release: **1.0.0**
+
 Nong Yoong is a Python 3.11 edge voice robot split between a Raspberry Pi and a
 workstation.
 
@@ -203,6 +205,8 @@ device-specific cases are reported as skipped.
 
 Hardware acceptance steps and metrics are in
 [docs/hardware-validation.md](docs/hardware-validation.md).
+The exact active, fallback, and unused technology inventory for this release is
+in [docs/technology-audit-v1.0.md](docs/technology-audit-v1.0.md).
 
 ## Version control in this workspace
 

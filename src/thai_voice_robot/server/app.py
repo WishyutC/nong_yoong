@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from thai_voice_robot import __version__
 from thai_voice_robot.config import ServerSettings
 from thai_voice_robot.contracts import ConversationRequest
 from thai_voice_robot.server.backends import (
@@ -93,7 +94,7 @@ def create_app(
 ) -> FastAPI:
     active_settings = settings or ServerSettings.from_env()
     active_service = service or _build_service(active_settings)
-    app = FastAPI(title="Nong Yoong Thai Voice Robot API", version="1.0.0")
+    app = FastAPI(title="Nong Yoong Thai Voice Robot API", version=__version__)
     app.state.settings = active_settings
     app.state.service = active_service
     conversation_worker = SerializedWorker()
