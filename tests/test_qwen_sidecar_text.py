@@ -40,6 +40,15 @@ class QwenSidecarTextTests(unittest.TestCase):
 
         self.assertEqual([len(chunk) for chunk in chunks], [60, 60, 60, 1])
 
+    def test_end_padding_adds_exact_silence_duration(self) -> None:
+        waveform = MODULE.np.ones(240, dtype=MODULE.np.float32)
+
+        padded = MODULE.append_end_padding(waveform, 24_000, padding_ms=500)
+
+        self.assertEqual(len(padded), 12_240)
+        self.assertTrue(MODULE.np.all(padded[:240] == 1.0))
+        self.assertTrue(MODULE.np.all(padded[240:] == 0.0))
+
 
 if __name__ == "__main__":
     unittest.main()

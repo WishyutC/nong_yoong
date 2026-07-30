@@ -47,6 +47,7 @@ MAX_NEW_TOKENS = int(os.getenv("NONG_YOONG_QWEN_TTS_MAX_NEW_TOKENS", "2048"))
 SPEAKING_SPEED = float(os.getenv("NONG_YOONG_QWEN_TTS_SPEED", "0.90"))
 MAX_CHUNK_CHARS = int(os.getenv("NONG_YOONG_QWEN_TTS_MAX_CHUNK_CHARS", "160"))
 CHUNK_PAUSE_MS = int(os.getenv("NONG_YOONG_QWEN_TTS_CHUNK_PAUSE_MS", "180"))
+END_PADDING_MS = int(os.getenv("NONG_YOONG_QWEN_TTS_END_PADDING_MS", "500"))
 REFERENCE_AUDIO = env_path(
     "NONG_YOONG_QWEN_TTS_REF_AUDIO",
     PROJECT_ROOT / "data" / "tts_samples" / "mms-thai-optimized.wav",
@@ -67,6 +68,8 @@ if not 60 <= MAX_CHUNK_CHARS <= 500:
     raise ValueError("NONG_YOONG_QWEN_TTS_MAX_CHUNK_CHARS must be 60 to 500")
 if not 0 <= CHUNK_PAUSE_MS <= 1000:
     raise ValueError("NONG_YOONG_QWEN_TTS_CHUNK_PAUSE_MS must be 0 to 1000")
+if not 0 <= END_PADDING_MS <= 3000:
+    raise ValueError("NONG_YOONG_QWEN_TTS_END_PADDING_MS must be 0 to 3000")
 
 os.environ.setdefault("MPLCONFIGDIR", str(TEMP_DIR / "matplotlib"))
 
@@ -164,6 +167,16 @@ def write_pcm16_wav(waveform: Any, sample_rate: int, destination: Path) -> None:
     sf.write(destination, samples, sample_rate, subtype="PCM_16")
 
 
+def append_end_padding(
+    waveform: Any, sample_rate: int, padding_ms: int = END_PADDING_MS
+) -> np.ndarray:
+    """Append silence so playback hardware cannot swallow the last syllable."""
+
+    samples = np.asarray(waveform, dtype=np.float32).reshape(-1)
+    padding = np.zeros(int(sample_rate * padding_ms / 1000), dtype=np.float32)
+    return np.concatenate((samples, padding))
+
+
 class Engine:
     def __init__(self) -> None:
         self.model: Any = None
@@ -229,6 +242,7 @@ class Engine:
             import librosa
 
             combined = librosa.effects.time_stretch(combined, rate=SPEAKING_SPEED)
+        combined = append_end_padding(combined, sample_rate)
         write_pcm16_wav(combined, sample_rate, destination)
 
 
@@ -257,7 +271,8 @@ class Handler(BaseHTTPRequestHandler):
                 "status": "ready",
                 "detail": (
                     f"Qwen3-TTS {MODEL_ID} loaded on {DEVICE}; "
-                    f"speed={SPEAKING_SPEED}, chunk={MAX_CHUNK_CHARS} chars"
+                    f"speed={SPEAKING_SPEED}, chunk={MAX_CHUNK_CHARS} chars, "
+                    f"tail={END_PADDING_MS} ms"
                 ),
             },
         )
@@ -320,7 +335,8 @@ def main() -> None:
     engine.preload()
     print(
         f"Qwen3-TTS {MODEL_ID} loaded on {DEVICE} "
-        f"(speed={SPEAKING_SPEED}, chunk={MAX_CHUNK_CHARS} chars)"
+        f"(speed={SPEAKING_SPEED}, chunk={MAX_CHUNK_CHARS} chars, "
+        f"tail={END_PADDING_MS} ms)"
     )
     if args.preload:
         return

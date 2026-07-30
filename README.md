@@ -110,7 +110,10 @@ endings. `NONG_YOONG_QWEN_TTS_SPEED=0.90` makes playback ten percent slower
 without lowering pitch. Lower values speak more slowly; the supported range is
 `0.75` to `1.25`. Chunk size and the pause between chunks are controlled by
 `NONG_YOONG_QWEN_TTS_MAX_CHUNK_CHARS` and
-`NONG_YOONG_QWEN_TTS_CHUNK_PAUSE_MS`.
+`NONG_YOONG_QWEN_TTS_CHUNK_PAUSE_MS`. A final
+`NONG_YOONG_QWEN_TTS_END_PADDING_MS=500` silence buffer prevents playback
+hardware from swallowing the last syllable; it does not mask missing model
+output.
 
 MMS Thai exposes its VITS inference controls through `.env`. The tuned defaults
 are a slightly slower `NONG_YOONG_MMS_SPEAKING_RATE=0.95`, clearer
