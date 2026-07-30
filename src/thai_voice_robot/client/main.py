@@ -36,6 +36,7 @@ def main() -> None:
         settings.server_url,
         timeout=settings.request_timeout_seconds,
         chunk_size=settings.stream_chunk_bytes,
+        api_token=settings.api_token,
     )
     player = (
         NullAudioPlayer()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from hmac import compare_digest
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -107,6 +108,39 @@ def create_app(
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def bearer_authentication(request: Request, call_next):
+        """Protect API data while leaving the minimal liveness probe public."""
+
+        if (
+            not active_settings.api_token
+            or request.method == "OPTIONS"
+            or request.url.path == "/health/live"
+        ):
+            return await call_next(request)
+
+        authorization = request.headers.get("authorization", "")
+        scheme, separator, provided_token = authorization.partition(" ")
+        valid = (
+            bool(separator)
+            and scheme.lower() == "bearer"
+            and bool(provided_token)
+            and compare_digest(
+                provided_token.encode("utf-8"),
+                active_settings.api_token.encode("utf-8"),
+            )
+        )
+        if not valid:
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "code": "unauthorized",
+                    "detail": "missing or invalid bearer token",
+                },
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return await call_next(request)
 
     @app.exception_handler(BackendUnavailable)
     async def backend_error_handler(

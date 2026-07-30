@@ -27,6 +27,7 @@ def main() -> None:
         "aplay or ffplay": bool(shutil.which("aplay") or shutil.which("ffplay")),
         "FastAPI": importlib.util.find_spec("fastapi") is not None,
         "requests": importlib.util.find_spec("requests") is not None,
+        "API bearer token (32+ characters)": len(client.api_token) >= 32,
         "sherpa-onnx (Pi voice mode)": importlib.util.find_spec("sherpa_onnx") is not None,
         "sounddevice (Pi voice mode)": importlib.util.find_spec("sounddevice") is not None,
         "WebRTC VAD (Pi voice mode)": importlib.util.find_spec("webrtcvad") is not None,

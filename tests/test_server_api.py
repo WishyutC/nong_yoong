@@ -15,6 +15,9 @@ from thai_voice_robot.server.service import ResponseService
 from thai_voice_robot.server.store import ConversationStore
 
 
+API_TOKEN = "test-token-that-is-at-least-32-characters-long"
+
+
 class ServerAPITests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
@@ -24,6 +27,7 @@ class ServerAPITests(unittest.TestCase):
             database_path=root / "conversations.sqlite3",
             llm_backend="echo",
             tts_backend="espeak",
+            api_token=API_TOKEN,
         )
         self.llm = CountingLLM()
         self.service = ResponseService(
@@ -37,12 +41,16 @@ class ServerAPITests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
-    def request(self, method: str, path: str, **kwargs):
+    def request(self, method: str, path: str, *, authenticated: bool = True, **kwargs):
         async def send():
             transport = httpx.ASGITransport(app=self.app)
             async with httpx.AsyncClient(
                 transport=transport, base_url="http://testserver"
             ) as client:
+                headers = dict(kwargs.pop("headers", {}))
+                if authenticated:
+                    headers["Authorization"] = f"Bearer {API_TOKEN}"
+                kwargs["headers"] = headers
                 return await client.request(method, path, **kwargs)
 
         return asyncio.run(send())
@@ -80,6 +88,22 @@ class ServerAPITests(unittest.TestCase):
         response = self.request("GET", "/health/ready")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "ready")
+
+    def test_bearer_token_protects_api_but_not_liveness(self) -> None:
+        live = self.request("GET", "/health/live", authenticated=False)
+        missing = self.request("GET", "/health/ready", authenticated=False)
+        invalid = self.request(
+            "GET",
+            "/v1/dashboard/summary",
+            authenticated=False,
+            headers={"Authorization": "Bearer wrong-token"},
+        )
+
+        self.assertEqual(live.status_code, 200)
+        self.assertEqual(missing.status_code, 401)
+        self.assertEqual(missing.headers["www-authenticate"], "Bearer")
+        self.assertEqual(missing.json()["code"], "unauthorized")
+        self.assertEqual(invalid.status_code, 401)
 
     def test_same_request_id_cannot_move_to_another_session(self) -> None:
         request_id = str(uuid4())

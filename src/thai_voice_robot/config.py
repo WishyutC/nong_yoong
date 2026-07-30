@@ -38,11 +38,19 @@ def _env_path(name: str, default: Path) -> Path:
     return Path(os.getenv(name, str(default))).expanduser().resolve()
 
 
+def _env_api_token() -> str:
+    token = os.getenv("NONG_YOONG_API_TOKEN", "").strip()
+    if token and len(token) < 32:
+        raise ValueError("NONG_YOONG_API_TOKEN must contain at least 32 characters")
+    return token
+
+
 @dataclass(frozen=True, slots=True)
 class ServerSettings:
     host: str = "0.0.0.0"
     port: int = 5000
     public_base_url: str = ""
+    api_token: str = ""
     ollama_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "gemma3:12b"
     llm_backend: str = "ollama"
@@ -81,6 +89,7 @@ class ServerSettings:
             host=os.getenv("NONG_YOONG_HOST", "0.0.0.0"),
             port=_env_int("NONG_YOONG_PORT", 5000),
             public_base_url=os.getenv("NONG_YOONG_PUBLIC_BASE_URL", "").rstrip("/"),
+            api_token=_env_api_token(),
             ollama_url=os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/"),
             ollama_model=os.getenv("OLLAMA_MODEL", "gemma3:12b"),
             llm_backend=os.getenv("NONG_YOONG_LLM_BACKEND", "ollama").lower(),
@@ -116,6 +125,7 @@ class ServerSettings:
 @dataclass(frozen=True, slots=True)
 class ClientSettings:
     server_url: str = "http://127.0.0.1:5000"
+    api_token: str = ""
     activation_mode: str = "keyboard"
     stt_model_dir: Path = field(
         default_factory=lambda: PROJECT_ROOT
@@ -147,7 +157,10 @@ class ClientSettings:
     @classmethod
     def from_env(cls) -> ClientSettings:
         return cls(
-            server_url=os.getenv("NONG_YOONG_SERVER_URL", "http://127.0.0.1:5000").rstrip("/"),
+            server_url=os.getenv(
+                "NONG_YOONG_SERVER_URL", "http://127.0.0.1:5000"
+            ).rstrip("/"),
+            api_token=_env_api_token(),
             activation_mode=os.getenv("NONG_YOONG_ACTIVATION", "keyboard").lower(),
             stt_model_dir=_env_path(
                 "NONG_YOONG_STT_MODEL_DIR",

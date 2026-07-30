@@ -60,8 +60,19 @@ cd ~/nong_yoong
 cp .env.workstation.example .env
 ```
 
-Edit `.env`, especially `NONG_YOONG_PUBLIC_BASE_URL`, to use the workstation's
-LAN IP. Ensure Ollama is running and the configured model exists:
+Edit `.env`, especially `NONG_YOONG_PUBLIC_BASE_URL`. Generate a strong API
+token and keep it out of version control:
+
+```bash
+openssl rand -hex 32
+```
+
+Put the result in the workstation `.env` as `NONG_YOONG_API_TOKEN`, then copy
+the same value into the Pi `.env`. When this variable is non-empty, every
+endpoint except `/health/live` requires `Authorization: Bearer <token>`.
+Leaving it empty disables authentication and is suitable only for isolated
+local development. Configured tokens shorter than 32 characters are rejected.
+Ensure Ollama is running and the configured model exists:
 
 ```bash
 ollama list
@@ -154,6 +165,8 @@ cp .env.pi.example .env
 The Pi template sends API, health, and streamed-audio requests through
 `https://api.wishayutc.org`. Change `NONG_YOONG_SERVER_URL` in `.env` only if
 the tunnel hostname changes or the Pi should connect directly over the LAN.
+Set `NONG_YOONG_API_TOKEN` to exactly the same private value used by the
+workstation API.
 
 The downloader uses the official sherpa-onnx Thai model archive but extracts
 only the INT8 encoder/joiner, decoder, and token table needed at runtime.
@@ -191,6 +204,9 @@ set `NONG_YOONG_AUDIO_PLAYER=aplay` on the Pi when an ALSA device is required.
 - `GET /v1/sessions/{session_id}/events`: conversation history
 - `GET /v1/dashboard/summary`: real turn/session totals
 - `POST /generate`: temporary non-Base64 legacy adapter
+
+All endpoints above require the configured bearer token. `/health/live` is the
+only public endpoint and returns no model, conversation, or configuration data.
 
 The complete payload contract is in [docs/api-contract.md](docs/api-contract.md).
 

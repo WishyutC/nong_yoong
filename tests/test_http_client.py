@@ -40,11 +40,15 @@ class FakeSession:
     def __init__(self, response_payload: dict, audio: bytes):
         self.response_payload = response_payload
         self.audio = audio
+        self.post_calls: list[tuple[tuple, dict]] = []
+        self.get_calls: list[tuple[tuple, dict]] = []
 
     def post(self, *args, **kwargs):
+        self.post_calls.append((args, kwargs))
         return FakeResponse(payload=self.response_payload)
 
     def get(self, url, *args, **kwargs):
+        self.get_calls.append(((url, *args), kwargs))
         if url.endswith("/health/ready"):
             return FakeResponse(payload={"status": "ready"})
         return FakeResponse(content=self.audio)
@@ -65,15 +69,32 @@ class HTTPClientTests(unittest.TestCase):
                     url=f"/v1/audio/{request.request_id}.wav", sample_rate_hz=16_000
                 ),
             ).to_payload()
-            client = WorkstationClient("http://workstation:5000", chunk_size=64)
-            client._session = FakeSession(payload, source.read_bytes())
+            client = WorkstationClient(
+                "http://workstation:5000",
+                chunk_size=64,
+                api_token="private-test-token",
+            )
+            session = FakeSession(payload, source.read_bytes())
+            client._session = session
 
+            client.health()
             response = client.respond(request)
             destination = client.download_audio(response, root / "downloads")
 
             self.assertEqual(response.request_id, request.request_id)
             self.assertEqual(destination.read_bytes(), source.read_bytes())
             self.assertFalse(destination.with_suffix(".wav.part").exists())
+            self.assertEqual(
+                session.post_calls[0][1]["headers"]["Authorization"],
+                "Bearer private-test-token",
+            )
+            self.assertTrue(
+                all(
+                    call[1]["headers"]["Authorization"]
+                    == "Bearer private-test-token"
+                    for call in session.get_calls
+                )
+            )
 
     def test_external_audio_host_is_rejected(self) -> None:
         response = ConversationResponse(

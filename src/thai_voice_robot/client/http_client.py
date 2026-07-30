@@ -39,18 +39,26 @@ class WorkstationClient:
         chunk_size: int = 64 * 1024,
         max_audio_bytes: int = 100 * 1024 * 1024,
         retries: int = 2,
+        api_token: str = "",
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.chunk_size = chunk_size
         self.max_audio_bytes = max_audio_bytes
         self.retries = retries
+        self._auth_headers = (
+            {"Authorization": f"Bearer {api_token.strip()}"}
+            if api_token.strip()
+            else {}
+        )
         self._session = requests.Session()
 
     def health(self) -> dict:
         try:
             response = self._session.get(
-                f"{self.base_url}/health/ready", timeout=min(self.timeout, 5)
+                f"{self.base_url}/health/ready",
+                headers=self._auth_headers,
+                timeout=min(self.timeout, 5),
             )
             payload = response.json()
         except (requests.RequestException, ValueError) as exc:
@@ -66,7 +74,10 @@ class WorkstationClient:
                 response = self._session.post(
                     f"{self.base_url}/v1/responses",
                     json=request.to_payload(),
-                    headers={"X-Request-ID": request.request_id},
+                    headers={
+                        **self._auth_headers,
+                        "X-Request-ID": request.request_id,
+                    },
                     timeout=self.timeout,
                 )
                 if response.status_code in {502, 503, 504} and attempt < self.retries:
@@ -102,7 +113,12 @@ class WorkstationClient:
         temporary = destination.with_suffix(".wav.part")
         total = 0
         try:
-            with self._session.get(audio_url, stream=True, timeout=self.timeout) as download:
+            with self._session.get(
+                audio_url,
+                headers=self._auth_headers,
+                stream=True,
+                timeout=self.timeout,
+            ) as download:
                 download.raise_for_status()
                 with temporary.open("wb") as output:
                     for chunk in download.iter_content(chunk_size=self.chunk_size):

@@ -3,9 +3,36 @@
 The first implementation keeps text/LLM/TTS as one serialized workstation
 operation, but removes WAV data from JSON. All IDs are UUID strings.
 
+## Authentication
+
+Set the same `NONG_YOONG_API_TOKEN` secret on the workstation and every client.
+Authenticated requests include:
+
+```http
+Authorization: Bearer <token>
+```
+
+When a token is configured, missing or incorrect credentials return `401` with
+`WWW-Authenticate: Bearer`. Only `GET /health/live` remains public. Generate a
+deployment secret with `openssl rand -hex 32`; never commit its value.
+
 ## Generate a response
 
 `POST /v1/responses`
+
+Example:
+
+```bash
+curl https://api.wishayutc.org/v1/responses \
+  --header "Authorization: Bearer $NONG_YOONG_API_TOKEN" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "request_id": "7a2e7093-d4a7-4ad1-8515-af1c82b40c1d",
+    "session_id": "bb1bd0a7-6f24-4bbc-a981-621836db8b8c",
+    "text": "สวัสดี น้องยูง",
+    "language": "th"
+  }'
+```
 
 Request:
 
